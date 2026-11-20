@@ -48,7 +48,7 @@
         <p class="form-note"><button type="button" class="text-link" id="access-toggle">还没有账号？去注册</button></p>
       </div>
       <template id="signup-template"><form id="signup-form" name="signup" action="/api/register" method="post">
-        <label for="signup-username">账号</label><input id="signup-username" name="username" autocomplete="username" autocapitalize="none" spellcheck="false" required maxlength="48" placeholder="取一个家人能找到的账号">
+        <label for="signup-username">账号</label><input id="signup-username" name="username" autocomplete="username" autocapitalize="none" spellcheck="false" required placeholder="取一个家人能找到的账号">
         <label for="signup-password">设置密码</label>
         <p id="password-rule" class="field-hint">8–16 个字符，可以使用字母、数字和特殊符号。</p>
         <div class="pass"><input id="signup-password" name="password" type="password" passwordrules="minlength: 8; maxlength: 16;" autocomplete="new-password" required aria-describedby="password-rule"><button type="button" aria-controls="signup-password" aria-pressed="false">显示</button></div>
@@ -122,7 +122,7 @@
     </div>
   </section>
 </main>
-<dialog id="confirm"><h2 id="confirm-title"></h2><p id="confirm-text"></p><div class="dialog-actions"><button id="cancel" class="quiet">取消</button><button class="primary" id="confirm-action">确认</button></div></dialog>
+<dialog id="confirm" aria-labelledby="confirm-title" aria-describedby="confirm-text"><h2 id="confirm-title"></h2><p id="confirm-text"></p><div class="dialog-actions"><button id="cancel" class="quiet">取消</button><button class="primary" id="confirm-action">确认</button></div></dialog>
 <dialog id="management-sheet" class="paper-note" aria-labelledby="management-title">
   <div class="note-heading"><h2 id="management-title">管理课程</h2><button type="button" id="close-management" class="close-note" aria-label="关闭课程管理">×</button></div>
   <p id="managed-course"></p>
@@ -186,7 +186,7 @@
   <div class="note-heading"><h2 id="activity-heading">操作记录</h2><button id="activity-close" class="close-note" aria-label="关闭操作记录">×</button></div>
   <p id="activity-family" class="sheet-subtitle"></p>
   <p id="activity-status" role="status"></p><button class="quiet" id="activity-retry" hidden>重试</button>
-  <ol id="activity-list" class="activity-list" aria-label="最近的操作记录"></ol>
+  <ol id="activity-list" class="activity-list" tabindex="0" aria-label="最近的操作记录"></ol>
 </dialog>
 <aside id="guide-sheet" hidden aria-label="新手引导">
   <div class="guide-top"><span id="guide-step"></span><button class="text-link" id="guide-skip">跳过</button></div>

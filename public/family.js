@@ -63,6 +63,13 @@ export function familyControls({ api, current, switchFamily, showLogin, notice }
     cards(data.families);
     tour.render(data);
   }
+  function updateFamilies(families) {
+    const data = current();
+    data.families = families;
+    const family = families.find(item => item.id === data.family.id);
+    if (family) data.family = family;
+    render(data);
+  }
   function closeMenu() {
     clearTimeout(closeTimer);
     menuVersion++;
@@ -79,8 +86,7 @@ export function familyControls({ api, current, switchFamily, showLogin, notice }
     const version = ++menuVersion, id = current().family.id;
     api("members", {}, id).then(({families}) => {
       if (version !== menuVersion || current()?.family?.id !== id) return;
-      current().families = families;
-      cards(families);
+      updateFamilies(families);
     }).catch(err => {
       if (version === menuVersion) {
         if (err.status === 401) showLogin(); else notice(err.message, true);
@@ -141,7 +147,7 @@ export function familyControls({ api, current, switchFamily, showLogin, notice }
     try {
       const { members, families } = await api("members", {}, family.id);
       if (!sheet.open || version !== listVersion || current()?.family?.id !== family.id) return;
-      cards(families);
+      updateFamilies(families);
       el("invite-details").hidden = false;
       const rows = members.map(person => {
         const row = node("li", ""), info = node("div", ""), edit = node("button", "编辑");
@@ -153,8 +159,6 @@ export function familyControls({ api, current, switchFamily, showLogin, notice }
         return row;
       });
       el("member-list").replaceChildren(...rows);
-      const mine = members.find(person => person.id === userId);
-      if (mine) portrait(mine.role, el("my-avatar"));
     } catch (err) { if (sheet.open && version === listVersion) failure(err, "family-error"); }
   }
   function form(action, member = null) {
@@ -264,17 +268,29 @@ export function familyControls({ api, current, switchFamily, showLogin, notice }
   el("remove-cancel").onclick = () => { if (!writing) form("edit", target); };
   el("remove-confirm").onclick = () => submit(true);
   el("family-form").onsubmit = event => { event.preventDefault(); void submit(false); };
+  async function openSavedFamily(id, message) {
+    try {
+      await switchFamily(id);
+      notice(message);
+    } catch (err) {
+      if (err.status === 401) showLogin();
+      else notice(message + " 暂时无法打开手账，请刷新后重试。", true);
+    } finally { sheet.close(); }
+  }
   async function submit(remove) {
     if (writing || current()?.family?.id !== editingFamily) return;
+    const familyId = editingFamily, userId = current().userId;
+    const stillEditing = () => sheet.open && current()?.userId === userId && current()?.family?.id === familyId;
     writing = true;
     const submitButton = el(remove ? "remove-confirm" : "family-save");
     submitButton.disabled = true;
     el("family-error").textContent = "";
     try {
       if (remove) {
-        await write("members", "DELETE", { username: target.username }, editingFamily);
-        if (target.id === current().userId) { await switchFamily(null); sheet.close(); }
-        else await home();
+        await write("members", "DELETE", { username: target.username }, familyId);
+        if (!stillEditing()) return;
+        if (target.id === userId) return await openSavedFamily(null, "已退出家庭。");
+        await home();
         notice("家庭成员已更新。");
       } else {
         const chosen = el("family-form").elements["family-role"].value;
@@ -284,19 +300,19 @@ export function familyControls({ api, current, switchFamily, showLogin, notice }
           const result = joining
             ? await write("families/join", "POST", { code: el("join-code").value.trim(), role })
             : await write("families", "POST", { name: el("house-name").value.trim(), role });
-          await switchFamily(result.familyId);
-          sheet.close();
-          notice(joining ? "已打开家人的手账。" : "家庭已建好，可以添加第一门课了。");
+          if (!stillEditing()) return;
+          await openSavedFamily(result.familyId, joining ? "已加入家庭。" : "家庭已建好，可以添加第一门课了。");
         } else {
           const adding = mode === "add";
           await write("members", adding ? "POST" : "PATCH", {
             username: adding ? el("member-account").value.trim() : target.username, role
-          }, editingFamily);
+          }, familyId);
+          if (!stillEditing()) return;
           await home();
           notice(adding ? "家人已加入，可以一起记课啦。" : "称呼已更新。");
         }
       }
-    } catch (err) { failure(err, "family-error"); }
+    } catch (err) { if (stillEditing()) failure(err, "family-error"); }
     finally { writing = false; submitButton.disabled = false; }
   }
   const formatTime = new Intl.DateTimeFormat("zh-CN", { dateStyle: "medium", timeStyle: "short" });
@@ -329,6 +345,24 @@ export function familyControls({ api, current, switchFamily, showLogin, notice }
   };
   el("activity-close").onclick = () => history.close();
   el("activity-retry").onclick = readHistory;
-  function close() { listVersion++; historyVersion++; sheet.close(); history.close(); closeMenu(); tour.stop(); }
+  function close() {
+    listVersion++;
+    historyVersion++;
+    sheet.close();
+    history.close();
+    closeMenu();
+    tour.stop();
+    mode = target = editingFamily = null;
+    familySignature = "";
+    el("family-form").reset();
+    el("invite-url").value = "";
+    el("invite-details").open = false;
+    el("invite-ready").hidden = true;
+    opener.removeAttribute("aria-label");
+    el("family-heading").textContent = "我的家庭";
+    for (const id of ["family-list", "member-list", "activity-list", "role-grid", "family-name",
+      "activity-family", "activity-status", "invite-status", "invite-code", "invite-expiry",
+      "remove-copy", "family-error"]) el(id).replaceChildren();
+  }
   return { render, close, afterCourse: tour.afterCourse, stopTour: tour.stop, reset() { close(); tour.reset(); } };
 }

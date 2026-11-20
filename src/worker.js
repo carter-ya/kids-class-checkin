@@ -35,11 +35,11 @@ function usernameKey(value) {
   return typeof value === "string" ? value.trim().normalize("NFC").toLowerCase() : "";
 }
 
-async function allowAttempt(db, key, now) {
+async function allowAttempt(db, key, now, limit = 10) {
   await db.prepare("DELETE FROM login_attempts WHERE expires_at <= ?").bind(now).run();
   return db.prepare(
-    "INSERT INTO login_attempts VALUES (?, 1, ?) ON CONFLICT(client) DO UPDATE SET attempts=attempts+1 WHERE attempts < 10 RETURNING expires_at"
-  ).bind(key, now + 600).first();
+    "INSERT INTO login_attempts VALUES (?, 1, ?) ON CONFLICT(client) DO UPDATE SET attempts=attempts+1 WHERE attempts < ? RETURNING expires_at"
+  ).bind(key, now + 600, limit).first();
 }
 
 function familyName(value) {
@@ -82,14 +82,18 @@ async function login(request, env, now) {
   }
   const client = await digest(request.headers.get("CF-Connecting-IP") || "local");
   const db = env.DB;
-  const attempt = await allowAttempt(db, client, now);
-  if (!attempt) return error("尝试次数过多，请稍后再试", 429);
+  const source = "login-ip-" + client;
+  const account = "login-account-" + client + "-" + await digest(name);
+  if (!await allowAttempt(db, source, now, 60) || !await allowAttempt(db, account, now)) {
+    return error("尝试次数过多，请稍后再试", 429);
+  }
   const user = await db.prepare("SELECT id, salt, password_hash FROM users WHERE username=?").bind(name).first();
   const hash = await passwordHash(password, user?.salt || "00000000000000000000000000000000");
   if (!user || !equal(hash, user.password_hash)) return error("账号或密码有误", 401);
   const token = randomHex(32);
   await db.batch([
-    db.prepare("DELETE FROM login_attempts WHERE client=?").bind(client),
+    db.prepare("DELETE FROM login_attempts WHERE client=?").bind(account),
+    db.prepare("UPDATE login_attempts SET attempts=MAX(0,attempts-1) WHERE client=?").bind(source),
     db.prepare("DELETE FROM sessions WHERE expires_at<=?").bind(now),
     db.prepare("INSERT INTO sessions VALUES (?, ?, ?)").bind(await digest(token), user.id, now + SESSION_AGE)
   ]);
@@ -133,9 +137,9 @@ const invitationSource = `FROM family_invitations i JOIN users u ON u.id=i.invit
 
 async function acceptInvitation(db, user, role, kind, key, now) {
   const legacy = kind === "legacy";
-  const source = legacy ? "FROM family_codes i WHERE i.code=?" :
+  const source = legacy ? "FROM family_codes i WHERE i.code=? AND i.expires_at>?" :
     invitationSource + (kind === "link" ? " WHERE i.link_token=?" : " WHERE i.short_code=?") + " AND i.expires_at>?";
-  const args = legacy ? [key] : [key, now];
+  const args = [key, now];
   const detail = legacy ? "'通过邀请码加入家庭'" : "'通过 @'||u.username||' 的邀请加入家庭'";
   const [, , found] = await db.batch([
     db.prepare(`INSERT INTO family_members(family_id,user_id,role) SELECT i.family_id,?,? ${source} ON CONFLICT DO NOTHING`).bind(user.id,role,...args),
@@ -236,7 +240,6 @@ async function handle(request, env) {
     try {
       const [created] = await db.batch([
         db.prepare("INSERT INTO families(name,owner_id) VALUES (?,?) RETURNING id").bind(name, user.id),
-        db.prepare("INSERT INTO family_codes(family_id) SELECT id FROM families WHERE owner_id=? AND name=?").bind(user.id, name),
         db.prepare("INSERT INTO family_members SELECT id,owner_id,? FROM families WHERE owner_id=? AND name=?").bind(role, user.id, name),
         db.prepare("INSERT INTO family_events(family_id,actor_id,actor_role,detail) SELECT id,owner_id,?,? FROM families WHERE owner_id=? AND name=?")
           .bind(role, "创建家庭「" + name + "」", user.id, name)
@@ -253,10 +256,8 @@ async function handle(request, env) {
     const role = familyRole(body.role ?? user.preferred_role);
     const legacy = /^[a-f0-9]{16}$/.test(code);
     if (!role || (!legacy && !/^[2-9A-HJ-NP-Z]{6}$/i.test(code))) return error("请输入 6 位邀请码和你的称呼", 400);
-    if (!legacy) {
-      const client = await digest(request.headers.get("CF-Connecting-IP") || "local");
-      if (!await allowAttempt(db,"invite-ip-" + client,now) || !await allowAttempt(db,"invite-user-" + user.id,now)) return error("尝试次数过多，请稍后再试",429);
-    }
+    const client = await digest(request.headers.get("CF-Connecting-IP") || "local");
+    if (!await allowAttempt(db,"invite-ip-" + client,now) || !await allowAttempt(db,"invite-user-" + user.id,now)) return error("尝试次数过多，请稍后再试",429);
     const joined = await acceptInvitation(db,user,role,legacy ? "legacy" : "short",legacy ? code : code.toUpperCase(),now);
     return joined ? json(joined) : error("邀请码已失效，请向家人确认最新的邀请码", 404);
   }
@@ -279,8 +280,7 @@ async function handle(request, env) {
   if (path === "/api/members" && method === "GET") {
     const members = await db.prepare(`SELECT u.id,u.username,m.role FROM family_members m JOIN users u ON u.id=m.user_id
       WHERE m.family_id=? AND ${allowed} ORDER BY (m.user_id=?) DESC,m.user_id`).bind(family.id, ...scope, family.ownerId).all();
-    const code = await db.prepare(`SELECT code FROM family_codes WHERE family_id=? AND ${allowed}`).bind(family.id,...scope).first("code");
-    return json({ members: members.results, families, code });
+    return json({ members: members.results, families });
   }
   if (path === "/api/history" && method === "GET") {
     const rows = (await db.prepare(`SELECT e.id,e.actor_role AS role,u.username,e.detail,e.happened_at AS time
@@ -312,14 +312,18 @@ async function handle(request, env) {
         detail = "将 " + target.username + " 的称呼从「" + member.role + "」改为「" + role + "」";
       }
     }
-    const statements = [change, audit(detail)];
+    const revocations = [];
     if (method === "DELETE") {
-      statements.push(
-        db.prepare("UPDATE family_codes SET code=lower(hex(randomblob(8))) WHERE family_id=? AND changes()>0").bind(family.id),
-        db.prepare("DELETE FROM family_invitations WHERE family_id=? AND changes()>0").bind(family.id)
+      // Check both memberships before deleting the member. Either invitation table may be empty.
+      const eligible = `family_id IN (SELECT family_id FROM family_members WHERE family_id=? AND user_id=? AND ${allowed})`;
+      const bindings = [family.id, target.id, ...scope];
+      revocations.push(
+        db.prepare("DELETE FROM family_codes WHERE " + eligible).bind(...bindings),
+        db.prepare("DELETE FROM family_invitations WHERE " + eligible).bind(...bindings)
       );
     }
-    const [write] = await db.batch(statements);
+    const results = await db.batch([...revocations, change, audit(detail)]);
+    const write = results[revocations.length];
     if (!write.meta.changes) return error(method === "POST" ? "该账号已在家庭中，或成员权限已更新" : "家庭成员已变更，请重新打开", 409);
     return json({ ok: true }, method === "POST" ? 201 : 200);
   }
@@ -348,9 +352,16 @@ async function handle(request, env) {
     if ((!courseRoute || method === "PATCH") && (!name || name.length > 60)) return error("请输入 1–60 个字符的课程名称", 400);
     try {
       if (courseRoute && !courseRoute[2] && method === "PATCH") {
-        const [updated] = await db.batch([db.prepare(`UPDATE courses SET name=? WHERE id=? AND family_id=? AND ${allowed}`).bind(name,courseId,family.id,...scope),
-          audit("将课程「" + course.name + "」改名为「" + name + "」")]);
-        if (!updated.meta.changes) return error("找不到这门课程", 404);
+        const inScope = `id=? AND family_id=? AND ${allowed}`;
+        const bindings = [courseId, family.id, ...scope];
+        const [, , present] = await db.batch([
+          db.prepare(`INSERT INTO family_events(family_id,actor_id,actor_role,detail)
+            SELECT family_id,?,?, '将课程「'||name||'」改名为「'||?||'」' FROM courses WHERE ${inScope} AND name<>?`)
+            .bind(user.id,family.role,name,...bindings,name),
+          db.prepare(`UPDATE courses SET name=? WHERE ${inScope} AND name<>?`).bind(name,...bindings,name),
+          db.prepare(`SELECT id FROM courses WHERE ${inScope}`).bind(...bindings)
+        ]);
+        if (!present.results.length) return error("找不到这门课程", 404);
         return json({ ok: true });
       }
       if (method !== "POST" || (courseRoute && !courseRoute[2])) return error("接口不存在", 404);

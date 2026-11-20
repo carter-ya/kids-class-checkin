@@ -28,7 +28,7 @@ npm run dev
 
 部署到自己的 Cloudflare 账号时，先运行 `npx wrangler login`。首次部署可用 `npx wrangler d1 create kids-class-checkin` 创建数据库，将返回的 `database_id` 填入 `wrangler.jsonc`。升级已有部署时使用原数据库。运行 `npm run db:remote` 应用迁移，然后运行 `npm run deploy`。自助注册无需管理员密钥。
 
-`CLASS_TIME_ZONE` 默认为 `Asia/Shanghai`，按上课地点判断当天日期。会话使用 HttpOnly Cookie，有效期 30 天，退出仅撤销当前设备的会话。注册和登录分别按来源 IP 限制尝试次数。
+`CLASS_TIME_ZONE` 默认为 `Asia/Shanghai`，按上课地点判断当天日期。会话使用 HttpOnly Cookie，有效期 30 天，退出仅撤销当前设备的会话。注册按来源 IP 限制尝试次数。登录同时限制来源 IP 和该来源下同一账号的尝试次数。升级前发出的 16 位邀请码在升级后最多保留 7 天。
 
 ## 接口
 

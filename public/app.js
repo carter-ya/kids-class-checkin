@@ -52,13 +52,10 @@ function view(name) {
   el("reload").hidden = true;
 }
 
-function showLogin() {
-  revision++;
+function clearJournal() {
   calendar = null;
   familyUI.reset();
-  access.reset();
   if (el("course-dialog").open) el("course-dialog").close();
-  el("term-range").textContent = "成长手账";
   document.querySelector(".summary").classList.remove("celebrate");
   month = "";
   if (el("confirm").open) el("confirm").close();
@@ -69,14 +66,25 @@ function showLogin() {
   el("owner").textContent = "";
   el("management-sheet").close();
   el("course-list").replaceChildren();
-  el("login-error").textContent = "";
-  el("password").value = "";
-  el("password").type = "password";
-  el("show-pass").textContent = "显示";
-  el("show-pass").setAttribute("aria-pressed", "false");
+  el("course-form").reset();
+  renderCycleBookmarks([], null);
+  for (const id of ["welcome-account", "managed-course", "course-title", "delete-description",
+    "selected-cycle-title", "selected-cycle-info", "period-range", "confirm-text"]) el(id).textContent = "";
+}
+
+function showLogin() {
+  revision++;
+  clearJournal();
+  access.reset();
   notice();
   view("login");
   if (inviteToken()) el("access-intro").textContent = "登录或注册后，就能继续接受家人的邀请。";
+}
+
+function showLoadFailure() {
+  view("loading");
+  el("loading").textContent = "暂时无法打开手账";
+  el("reload").hidden = false;
 }
 
 function showMonthlyOverview(show) {
@@ -120,9 +128,14 @@ function sticker(index) {
   return animal;
 }
 
+function replaceChoices(container, children, key) {
+  const focused = container.contains(document.activeElement) && document.activeElement.dataset[key];
+  container.replaceChildren(...children);
+  if (focused) container.querySelector(`[data-${key}="${CSS.escape(focused)}"]`)?.focus({ preventScroll: true });
+}
+
 function renderMonthlyOverview(counts) {
   const overview = el("month-groups");
-  const focusedMonth = overview.contains(document.activeElement) ? document.activeElement.dataset.month : null;
   const content = document.createDocumentFragment();
   let lastYear;
   let grid;
@@ -156,8 +169,7 @@ function renderMonthlyOverview(counts) {
     }
     grid.append(button);
   }
-  overview.replaceChildren(content);
-  if (focusedMonth) overview.querySelector('[data-month="' + focusedMonth + '"]')?.focus({ preventScroll: true });
+  replaceChoices(overview, [content], "month");
 }
 
 function currentMonth() {
@@ -199,7 +211,6 @@ function selectPeriod(data) {
 function renderCycleBookmarks(history, selectedId) {
   const field = el("history-field");
   const choices = el("cycle-choice");
-  const focusedId = choices.contains(document.activeElement) ? document.activeElement.dataset.cycle : null;
   field.hidden = history.length < 2;
   if (field.hidden) {
     field.open = false;
@@ -226,8 +237,7 @@ function renderCycleBookmarks(history, selectedId) {
     button.append(label, dates);
     return button;
   });
-  choices.replaceChildren(...buttons.reverse());
-  if (focusedId) choices.querySelector('[data-cycle="' + focusedId + '"]')?.focus({ preventScroll: true });
+  replaceChoices(choices, buttons.reverse(), "cycle");
 }
 
 function renderCourseControls() {
@@ -235,19 +245,19 @@ function renderCourseControls() {
   el("course-management").hidden = !period;
   el("dashboard").hidden = !period;
   el("empty-courses").hidden = !!period;
-  if (!period) {
-    el("term-range").textContent = "成长手账";
-    renderCycleBookmarks([], null);
-  }
-  el("course-list").replaceChildren();
-  for (const id of ["new-course", "renew", "rename", "first-course"]) el(id).disabled = busy;
+  for (const id of ["course-management", "first-course"]) el(id).disabled = busy;
   el("course-summary-month").textContent = Number(calendar.today.slice(5, 7)) + " 月课程";
-  if (!period) return;
+  if (!period) {
+    el("course-list").replaceChildren();
+    renderCycleBookmarks([], null);
+    return;
+  }
   const courses = new Map();
   for (const item of calendar.periods) {
     if (!courses.has(item.courseId)) courses.set(item.courseId, []);
     courses.get(item.courseId).push(item);
   }
+  const buttons = [];
   for (const periods of courses.values()) {
     const current = preferredPeriod(periods, calendar.today);
     const button = document.createElement("button");
@@ -265,13 +275,13 @@ function renderCourseControls() {
     copy.className = "course-copy";
     copy.append(name, stats);
     button.append(sticker((current.courseId - 1) % 12), copy);
-    el("course-list").append(button);
+    buttons.push(button);
   }
+  replaceChoices(el("course-list"), buttons, "cycle");
   const history = courses.get(period.courseId);
   el("course-title").textContent = period.name + " · 本期进度";
   renderCycleBookmarks(history, period.id);
   el("managed-course").textContent = period.name;
-  el("term-range").textContent = "成长手账";
   el("period-range").textContent = "本期 " + period.first.replaceAll("-", ".") + " 至 " + period.last.replaceAll("-", ".");
 }
 
@@ -330,7 +340,7 @@ function render() {
     if (date === today) button.setAttribute("aria-current", "date");
     children.push(button);
   }
-  el("days").replaceChildren(...children);
+  replaceChoices(el("days"), children, "date");
 }
 
 async function readCalendar(id, familyId = calendar?.family?.id) {
@@ -354,13 +364,33 @@ async function preferredCalendar(data) {
 }
 async function switchFamily(id) {
   if (busy) throw new Error("手账正在保存，请稍后再试");
+  const fromOpener = document.activeElement === el("family-open");
+  const version = ++revision;
   busy = true;
-  revision++;
   try {
+    if (id === null) {
+      // A completed membership removal invalidates the old journal even if the next read fails.
+      clearJournal();
+      view("loading");
+      el("loading").textContent = "正在打开手账…";
+    } else render();
     const data = await preferredCalendar(await readCalendar(null, id));
+    if (version !== revision) return;
     selectPeriod(data);
     try { if (data.family) localStorage.setItem("class-family-" + data.userId, data.family.id); } catch {}
-  } finally { busy = false; if (calendar) render(); }
+  } catch (err) {
+    if (version === revision && !calendar && err.status !== 401) showLoadFailure();
+    throw err;
+  } finally {
+    busy = false;
+    if (calendar) {
+      render();
+      if (document.activeElement === document.body) {
+        if (!calendar.family) el("welcome-create").focus();
+        else if (fromOpener || id === null) el("family-open").focus({ preventScroll: true });
+      }
+    }
+  }
 }
 function inviteToken() {
   const token = new URLSearchParams(location.search).get("invite");
@@ -400,11 +430,7 @@ async function refresh() {
   } catch (err) {
     if (version !== revision) return;
     if (err.status === 401) return showLogin();
-    if (!calendar) {
-      view("loading");
-      el("loading").textContent = "暂时无法打开手账";
-      el("reload").hidden = false;
-    }
+    if (!calendar) showLoadFailure();
     notice("读取失败，请检查网络后重试。", true);
   }
 }
@@ -426,6 +452,7 @@ async function loadPeriod(id) {
 
 async function switchPeriod(id) {
   if (busy) return;
+  const fromCard = el("course-list").contains(document.activeElement);
   busy = true;
   revision++;
   notice();
@@ -436,7 +463,12 @@ async function switchPeriod(id) {
     notice("切换失败，请重试", true);
   } finally {
     busy = false;
-    if (calendar) render();
+    if (calendar) {
+      render();
+      if (fromCard && document.activeElement === document.body) {
+        el("course-list").querySelector('[aria-pressed="true"]')?.focus({ preventScroll: true });
+      }
+    }
   }
 }
 

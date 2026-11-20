@@ -74,7 +74,12 @@ export function journalTour({ current, openMenu, closeMenu, complete, failure })
   async function finish() {
     if (saving || index < 0) return;
     saving = true;
-    try { await complete(); stop(); }
+    try {
+      await complete();
+      const returnTo = tip.contains(document.activeElement) && target;
+      stop();
+      if (returnTo) returnTo.focus({ preventScroll: true });
+    }
     catch (err) { failure(err, "guide-error"); }
     finally { saving = false; }
   }
@@ -89,7 +94,15 @@ export function journalTour({ current, openMenu, closeMenu, complete, failure })
     if (target?.contains(event.target)) next();
   }, true);
   document.addEventListener("keydown", event => {
-    if (index >= 0 && event.key === "Escape" && !document.querySelector("dialog[open]")) {
+    if (index < 0 || document.querySelector("dialog[open]")) return;
+    if (event.key === "Tab" && target && !tip.hidden) {
+      if (!event.shiftKey && event.target === target) {
+        event.preventDefault(); el("guide-skip").focus();
+      } else if (event.shiftKey && event.target === el("guide-skip")) {
+        event.preventDefault(); target.focus();
+      }
+    }
+    if (event.key === "Escape") {
       event.preventDefault(); void finish();
     }
   });

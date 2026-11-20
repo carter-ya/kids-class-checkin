@@ -46,6 +46,10 @@ export function accessControls(onSubmit) {
   };
   const password = field("signup-password"), confirm = field("confirm-password");
   function validate() {
+    const username = signup.elements.username;
+    const name = username.value.trim().normalize("NFC").toLowerCase();
+    username.setCustomValidity(username.value && !/^[\p{L}\p{N}._-]{1,48}$/u.test(name)
+      ? "账号限 1–48 个字母、汉字、数字、点、短横线或下划线。" : "");
     const length = [...password.value].length;
     password.setCustomValidity(length && (length < 8 || length > 16) ? "密码需要 8–16 个字符。" : "");
     confirm.setCustomValidity(confirm.value && password.value !== confirm.value ? "两次输入的密码不同，请再确认一次。" : "");
