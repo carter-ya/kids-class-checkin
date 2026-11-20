@@ -651,12 +651,33 @@ label > input:not([type="radio"]) { display: block; margin-top: 10px; }
 .skeleton-summary i:nth-child(2) { width: 62%; height: 18px; margin: 20px 0 12px; }
 .skeleton-summary i:last-child { width: 82%; height: 12px; }
 .skeleton-months > i { width: min(12rem, 65%); height: 30px; margin-bottom: 18px; }
-.skeleton-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
-.skeleton-grid b { height: clamp(3.5rem, 7vw, 6rem); background: #eee2d3; border-radius: 12px; }
+.skeleton-grid { display: grid; gap: 7px; }
+.skeleton-grid b { height: clamp(2.5rem, 5vw, 3.5rem); background: repeating-linear-gradient(to right, #eee2d3 0 calc(100% / 7 - 4px), transparent calc(100% / 7 - 4px) calc(100% / 7)); }
 #journal[data-opening="empty"] .skeleton-pages { display: none; }
-@media (max-width: 480px) { .skeleton-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+/* Each placeholder matches a member portrait and its two lines of text. */
+.member-skeleton { position: relative; overflow: hidden; margin: 10px 0 16px; }
+.member-skeleton i {
+  display: block; height: 58px; border-bottom: 1px dashed #d7ccb1;
+  background: radial-gradient(circle, #e5e7d5 60%, transparent 62%) left center / 42px 42px no-repeat,
+    linear-gradient(#e8dfce, #e8dfce) 52px 16px / 28% 11px no-repeat,
+    linear-gradient(#eee2d3, #eee2d3) 52px 36px / 42% 8px no-repeat;
+}
+#access-fields .primary[aria-busy="true"] {
+  background: #fae6b8; color: #624827; border-color: #cbad76; cursor: progress;
+}
+#access-fields .primary[aria-busy="true"]::before {
+  content: ""; display: inline-block; width: 1.5em; height: 1.5em;
+  margin-inline-end: .45em; vertical-align: -.35em;
+  background: url("/rabbit-icon.png") center / contain no-repeat;
+}
 @media (prefers-reduced-motion: no-preference) {
   .show-pending-sticker #course-list .is-pending { overflow: hidden; }
+  #access-fields .primary[aria-busy="true"]::before { animation: login-hop 760ms ease-in-out infinite; }
+  @keyframes login-hop {
+    0%, 100% { transform: translateY(0) rotate(-5deg); }
+    45% { transform: translateY(-4px) rotate(5deg); }
+  }
+  .member-skeleton::after,
   .journal-skeleton :is(.skeleton-course, .skeleton-summary, .skeleton-months)::after,
   .show-pending-sticker #course-list .is-pending .course-copy::after {
     content: ""; position: absolute; inset: 0; pointer-events: none;

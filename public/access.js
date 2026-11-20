@@ -90,12 +90,23 @@ export function accessControls(onSubmit) {
     const payload = { username: active.elements.username.value, password: active.elements.password.value };
     if (signingUp) payload.role = role === "其他" ? field("signup-custom").value.trim() : role;
     const submitter = active.querySelector(".primary");
+    if (submitter.disabled) return;
+    const label = submitter.textContent;
+    const progress = signingUp ? "正在创建账号…" : "小兔正在登录…";
+    submitter.textContent = progress;
+    submitter.setAttribute("aria-busy", "true");
+    el("access-status").textContent = progress;
     submitter.disabled = el("access-toggle").disabled = true;
     try {
       await onSubmit(signingUp ? "register" : "login", payload);
       active.elements.password.value = confirm.value = "";
     } catch (err) { el("login-error").textContent = err.status ? err.message : "网络连接失败，请重试"; }
-    finally { submitter.disabled = el("access-toggle").disabled = false; }
+    finally {
+      submitter.removeAttribute("aria-busy");
+      submitter.textContent = label;
+      el("access-status").textContent = "";
+      submitter.disabled = el("access-toggle").disabled = false;
+    }
   };
   return { reset: () => mode(false) };
 }
