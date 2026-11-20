@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f9f6ec"><title>小小上课日历 · 成长手账</title>
+  <link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48">
+  <link rel="icon" type="image/png" sizes="64x64" href="/rabbit-icon.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+  <link rel="stylesheet" href="/style.css"><script type="module" src="/app.js"></script>
+</head>
+<body>
+<header><div class="top wrap"><div class="brand"><img class="brand-rabbit" src="/rabbit-icon.png" width="44" height="44" alt="">小小上课日历</div><div class="term"><span aria-hidden="true">✿</span> <span id="term-range">成长手账</span></div><div id="family-tools" hidden>
+  <button id="family-open" class="family-tab" aria-expanded="false" aria-controls="family-menu"><i id="my-avatar" aria-hidden="true"></i><span id="owner"></span><i class="fold-mark" aria-hidden="true"></i></button>
+  <div id="family-menu" hidden>
+    <div id="family-list" role="group" aria-label="选择家庭"></div>
+    <div class="menu-actions">
+      <button id="manage-family"><i class="menu-icon" aria-hidden="true">❀</i>管理家人</button>
+      <button id="history-open"><i class="menu-icon" aria-hidden="true">✎</i>操作记录</button>
+      <button id="guide-replay"><i class="menu-icon" aria-hidden="true">✦</i>新手引导</button>
+      <button id="logout"><i class="menu-icon" aria-hidden="true">↪</i>退出登录</button>
+    </div>
+  </div>
+</div></div></header>
+<div id="notice-toast" class="toast">
+  <span class="toast-mark" aria-hidden="true"></span>
+  <p id="notice" role="status" aria-live="polite" aria-atomic="true"></p>
+  <button id="dismiss-notice" type="button" aria-label="关闭提示" hidden>×</button>
+</div>
+<main class="wrap">
+  <p id="loading" role="status">正在打开手账…</p>
+  <button id="reload" class="quiet" hidden>重新打开</button>
+  <section id="login" class="book" hidden aria-labelledby="book-title">
+    <div class="cover">
+      <div class="cover-heading"><span class="little-star" aria-hidden="true">✦</span><h1 id="book-title">上课<span>成长手账</span></h1></div>
+      <figure class="print"><i class="tape" aria-hidden="true"></i><span class="cover-scene"><img src="/garden.jpg" alt="背着小书包的兔子，走在开满花的上学小路上"><img class="shy-scene" src="/garden-shy.webp" alt=""></span><figcaption><span>我的上课小记</span><span class="pencil-stars" aria-hidden="true">✧ ★ ✧</span></figcaption></figure>
+    </div>
+    <div class="login-page"><div class="rings" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+      <div class="access-content">
+        <div class="bookmark" aria-hidden="true">★</div>
+        <h2 id="access-title">打开我的手账</h2>
+        <p class="intro" id="access-intro">登录后，记录孩子的每一个上课日。</p>
+        <div id="access-fields"><form id="login-form" name="login" action="/api/login" method="post">
+          <label for="username">账号</label><input id="username" name="username" autocomplete="username" autocapitalize="none" spellcheck="false" required maxlength="96" placeholder="请输入账号">
+          <label for="password">密码</label><div class="pass"><input id="password" name="password" type="password" autocomplete="current-password" required maxlength="256" placeholder="请输入密码"><button type="button" id="show-pass" aria-controls="password" aria-pressed="false">显示</button></div>
+          <button class="primary" id="submit-login">登录手账</button>
+        </form></div>
+        <p id="login-error" class="error" role="alert"></p>
+        <p class="form-note"><button type="button" class="text-link" id="access-toggle">还没有账号？去注册</button></p>
+      </div>
+      <template id="signup-template"><form id="signup-form" name="signup" action="/api/register" method="post">
+        <label for="signup-username">账号</label><input id="signup-username" name="username" autocomplete="username" autocapitalize="none" spellcheck="false" required maxlength="48" placeholder="取一个家人能找到的账号">
+        <label for="signup-password">设置密码</label>
+        <p id="password-rule" class="field-hint">8–16 个字符，可以使用字母、数字和特殊符号。</p>
+        <div class="pass"><input id="signup-password" name="password" type="password" passwordrules="minlength: 8; maxlength: 16;" autocomplete="new-password" required aria-describedby="password-rule"><button type="button" aria-controls="signup-password" aria-pressed="false">显示</button></div>
+        <label for="confirm-password">确认密码</label><div class="pass"><input id="confirm-password" name="confirmation" type="password" autocomplete="new-password" required placeholder="再输入一次密码"><button type="button" aria-controls="confirm-password" aria-pressed="false">显示</button></div>
+        <label for="signup-role-toggle">我的家庭称呼</label><div class="signup-picker">
+          <button type="button" id="signup-role-toggle" aria-controls="signup-role-grid" aria-expanded="false"><i id="signup-avatar"></i><strong id="signup-role-name">家人</strong><i class="fold-mark" aria-hidden="true"></i></button>
+          <div id="signup-role-grid" class="role-grid" role="group" aria-label="选择称呼" hidden></div>
+        </div>
+        <label id="signup-custom-field" hidden>自定义称呼<input id="signup-custom" maxlength="20" placeholder="例如：姑姑"></label>
+        <button class="primary" id="submit-signup">注册并打开手账</button>
+      </form></template>
+    </div>
+  </section>
+  <section id="family-welcome" class="welcome-note" hidden aria-labelledby="welcome-title">
+    <img src="/rabbit-icon.png" width="64" height="64" alt="">
+    <h1 id="welcome-title">从哪个家庭开始？</h1>
+    <p id="welcome-account"></p>
+    <div class="welcome-options">
+      <button id="welcome-create"><span aria-hidden="true">✿</span><strong>创建家庭</strong><small>给家里的第一本手账取个名字</small></button>
+      <button id="welcome-join"><span aria-hidden="true">✉</span><strong>加入家庭</strong><small>输入家人给你的邀请码</small></button>
+    </div>
+    <button id="welcome-refresh" class="text-link">家人已添加我的账号，刷新查看</button>
+    <button id="welcome-logout" class="text-link">退出登录</button>
+  </section>
+  <section id="journal" hidden aria-labelledby="journal-title">
+    <div class="journal-title"><h1 id="journal-title">我的上课日历</h1></div>
+    <div class="course-bar">
+      <h2 id="course-summary-month">本月课程</h2>
+      <button id="course-management" class="notebook-button" aria-haspopup="dialog"><span aria-hidden="true">✿</span> 管理课程</button>
+    </div>
+    <div id="course-list" role="group" aria-labelledby="course-summary-month"></div>
+    <details id="history-field" class="cycle-bookmarks" hidden>
+      <summary id="cycle-toggle">
+        <span class="cycle-tab">查看周期</span>
+        <span class="cycle-selection"><strong id="selected-cycle-title"></strong><span id="selected-cycle-info"></span></span>
+        <i class="fold-mark" aria-hidden="true"></i>
+      </summary>
+      <div id="cycle-choice" role="group" aria-label="选择课程周期"></div>
+    </details>
+    <p id="empty-courses" hidden>添加第一门课，开始记录上课日。 <button id="first-course" class="primary">添加第一门课</button></p>
+    <div id="dashboard" class="dashboard">
+      <section class="summary">
+        <div class="garden-window" aria-hidden="true">
+          <img class="scene" src="/garden.jpg" alt="">
+          <span class="butterfly"><i></i></span>
+        </div>
+        <div class="summary-body">
+        <h2 id="course-title">上课小脚印</h2><div class="counts">已上 <span class="tally"><strong id="count">0</strong><span class="sparkles" aria-hidden="true"><i>✦</i><i>★</i><i>✧</i></span></span> 节 <span>· 还剩 <b id="left">35</b> 节</span></div>
+        <progress id="progress" max="35" value="0" aria-label="已完成课时"></progress>
+        <button class="primary" id="check-today">今天上课啦</button>
+      </div></section>
+      <section class="month-card" aria-label="上课记录">
+        <div class="view-switch" role="group" aria-label="选择查看方式">
+          <button id="show-calendar" aria-controls="calendar-detail" aria-pressed="false">上课月历</button>
+          <button id="show-months" aria-controls="monthly-overview" aria-pressed="true">每月课时</button>
+        </div>
+        <p id="period-range" class="period-range"></p>
+        <div class="page-stack">
+        <div id="calendar-detail" inert>
+        <div class="month-toolbar calendar-banner"><div class="month-caption"><i id="month-friend" class="animal-sticker" aria-hidden="true"></i><h2 id="month-name" tabindex="-1"></h2></div><div class="month-actions"><button id="prev" aria-label="上个月">‹</button><button id="current">今天</button><button id="next" aria-label="下个月">›</button></div></div>
+        <div class="week" aria-hidden="true"><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span></div>
+        <div id="days" class="days"></div>
+        <div class="legend"><span><i></i> 今天</span><span><b>★</b> 已打卡</span><strong id="month-count"></strong></div>
+        </div>
+        <div id="monthly-overview">
+          <div id="years" class="month-toolbar" hidden><h3 id="year-label"></h3><div class="month-actions"><button id="prev-year" aria-label="上一年">‹</button><button id="next-year" aria-label="下一年">›</button></div></div>
+          <div id="month-groups"></div>
+        </div>
+        </div>
+      </section>
+    </div>
+  </section>
+</main>
+<dialog id="confirm"><h2 id="confirm-title"></h2><p id="confirm-text"></p><div class="dialog-actions"><button id="cancel" class="quiet">取消</button><button class="primary" id="confirm-action">确认</button></div></dialog>
+<dialog id="management-sheet" class="paper-note" aria-labelledby="management-title">
+  <div class="note-heading"><h2 id="management-title">管理课程</h2><button type="button" id="close-management" class="close-note" aria-label="关闭课程管理">×</button></div>
+  <p id="managed-course"></p>
+  <div class="course-actions">
+    <button id="new-course"><span aria-hidden="true">＋</span>添加课程</button>
+    <button id="renew"><span aria-hidden="true">❀</span>续课</button>
+    <button id="rename"><span aria-hidden="true">✎</span>改名字</button>
+  </div>
+  <button id="delete-course" class="delete-link">删除这门课程</button>
+</dialog>
+<dialog id="course-dialog" class="paper-note" aria-labelledby="course-dialog-title">
+  <form id="course-form">
+    <h2 id="course-dialog-title"></h2>
+    <div id="course-guide" hidden>
+      <img src="/rabbit-icon.png" width="30" height="30" alt=""><span id="course-guide-hint" role="status"></span>
+      <button id="skip-course-guide" type="button" class="text-link">跳过引导</button>
+    </div>
+    <p id="delete-description" hidden></p>
+    <label id="name-field">课程名称<input id="course-name" maxlength="60" required placeholder="例如：早教班"></label>
+    <fieldset id="cycle-fields">
+      <label>开始日期<input id="cycle-first" type="date" required></label>
+      <label>结束日期<input id="cycle-last" type="date" required></label>
+      <label>本周期总课时<input id="cycle-total" type="number" min="1" step="1" required></label>
+    </fieldset>
+    <p id="course-error" class="error" role="alert"></p>
+    <div class="dialog-actions"><button id="close-course" class="quiet" type="button">取消</button><button id="submit-course" class="primary">保存</button></div>
+  </form>
+</dialog>
+<dialog id="family-sheet" class="paper-note family-sheet" aria-labelledby="family-heading">
+  <div class="note-heading"><h2 id="family-heading">我的家庭</h2><button id="family-close" class="close-note" aria-label="关闭家庭">×</button></div>
+  <section id="family-home">
+    <h3 id="family-name"></h3>
+    <ul id="member-list" class="member-list"></ul>
+    <button class="primary" id="member-add">＋ 添加家人</button>
+    <details id="invite-details"><summary>邀请家人加入</summary>
+      <div id="invite-ready" hidden>
+        <button class="primary" id="share-invite" type="button">分享邀请链接</button>
+        <button class="text-link" id="copy-link" type="button">复制链接</button>
+        <label id="manual-link" hidden>长按或选中链接复制<input id="invite-url" readonly></label>
+        <div class="invite-row">手输邀请码 <code id="invite-code"></code><button class="quiet" id="copy-invite">复制短码</button></div>
+        <small id="invite-expiry"></small>
+      </div>
+      <p id="invite-status" role="status"></p><button class="quiet" id="invite-retry" hidden>重新获取</button>
+    </details>
+    <div class="family-links"><button class="text-link" id="family-create">创建新家庭</button><button class="text-link" id="family-join">加入其他家庭</button></div>
+  </section>
+  <form id="family-form" hidden>
+    <label id="account-field">家人的账号<span class="account-entry"><span aria-hidden="true">@</span><input id="member-account" pattern="[^@＠]+" placeholder="输入对方已注册的账号" maxlength="96" autocapitalize="none" spellcheck="false"></span></label>
+    <label id="invite-field" hidden>家庭邀请码<input id="join-code" placeholder="输入 6 位邀请码" autocapitalize="characters" spellcheck="false" maxlength="40"></label>
+    <label id="house-field">家庭名称<input id="house-name" placeholder="例如：小桃子之家" maxlength="70"></label>
+    <fieldset class="role-picker"><legend id="role-caption">在家怎么称呼？</legend><div id="role-grid" class="role-grid"></div>
+      <label id="custom-field" hidden>自定义称呼<input id="role-custom" maxlength="20" placeholder="例如：姑姑"></label>
+    </fieldset>
+    <div class="dialog-actions"><button type="button" id="family-back" class="quiet">返回</button><button id="family-save" class="primary">保存</button></div>
+    <button type="button" id="member-remove" class="text-link" hidden>移除成员</button>
+  </form>
+  <section id="remove-panel" hidden><p id="remove-copy"></p><div class="dialog-actions"><button id="remove-cancel" class="quiet">取消</button><button id="remove-confirm" class="primary danger">确认移除</button></div></section>
+  <p id="family-error" class="error" role="alert"></p>
+</dialog>
+<dialog id="activity-sheet" class="paper-note family-sheet" aria-labelledby="activity-heading">
+  <div class="note-heading"><h2 id="activity-heading">操作记录</h2><button id="activity-close" class="close-note" aria-label="关闭操作记录">×</button></div>
+  <p id="activity-family" class="sheet-subtitle"></p>
+  <p id="activity-status" role="status"></p><button class="quiet" id="activity-retry" hidden>重试</button>
+  <ol id="activity-list" class="activity-list" aria-label="最近的操作记录"></ol>
+</dialog>
+<aside id="guide-sheet" hidden aria-label="新手引导">
+  <div class="guide-top"><span id="guide-step"></span><button class="text-link" id="guide-skip">跳过</button></div>
+  <p id="guide-copy" role="status"></p><p id="guide-error" class="error" role="alert"></p>
+  <button class="text-link" id="guide-next">看下一处 ›</button>
+</aside>
+</body></html>
