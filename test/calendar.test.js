@@ -68,7 +68,7 @@ async function startApp(t, { migrateOnStart = true, fixedClock = true } = {}) {
 }
 
 test("首页直接显示登录或家庭入口，安全携带当前账号的日历并支持读取失败重试", async t => {
-  const { runtime, session, family, db } = await startApp(t);
+  const { runtime, session, family, db, post } = await startApp(t);
   async function home(cookie = "") {
     const response = await runtime.dispatchFetch(origin + "/", { headers: { Cookie: cookie, "If-None-Match": '"static-template"' } });
     assert.match(response.headers.get("Cache-Control"), /private, no-store/);
@@ -92,6 +92,9 @@ test("首页直接显示登录或家庭入口，安全携带当前账号的日�
   assert.ok(!visible(html, "login"));
   assert.match(html, /&lt;星星&amp;月亮&gt;/);
   assert.ok(!html.includes(name));
+  assert.match(html, /<section id="journal"[^>]* data-opening="empty"/);
+  assert.equal((await post("courses", { ...period, name: "早教课" }, cookie)).status, 201);
+  assert.match((await home(cookie)).html, /<section id="journal"[^>]* data-opening="courses"/);
   assert.ok(!(await home()).html.includes("home-tester"));
   await db.prepare("DROP TABLE sessions").run();
   const failure = await home(cookie);

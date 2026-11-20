@@ -189,7 +189,7 @@ async function invitePage(request, db, user, token, now) {
     <meta property="og:image:width" content="1080"><meta property="og:image:height" content="720"><meta property="og:image:alt" content="小兔子背着书包走在上学的花园小路上">
     <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="${previewTitle}">
     <meta name="twitter:description" content="${description}"><meta name="twitter:image" content="${image}">
-    <link rel="icon" href="/rabbit-icon.png"><link rel="stylesheet" href="/style.css"></head>
+    <link rel="icon" href="/rabbit-icon.png"><link rel="preload" href="/fonts/journal-ui-6d55d6648c.woff2" as="font" type="font/woff2" crossorigin><link rel="stylesheet" href="/style.css"></head>
     <body><header><div class="top wrap"><div class="brand"><img class="brand-rabbit" src="/rabbit-icon.png" alt="">小小上课日历</div></div></header>
     <main class="wrap"><article class="welcome-note invite-letter"><img src="/rabbit-icon.png" width="64" height="64" alt="">
     <h1>${escapeHTML(title)}</h1><p>${escapeHTML(copy)}</p>${action}</article></main></body></html>`;
@@ -220,7 +220,7 @@ async function homePage(request, env) {
     const data = await calendar.json();
     view = data.family ? "journal" : "family-welcome";
     page.on("#entry-calendar", { element: e => e.setInnerContent(JSON.stringify(data)) });
-    if (data.family) page.on("#journal", { element: e => e.setAttribute("data-opening", "") });
+    if (data.family) page.on("#journal", { element: e => e.setAttribute("data-opening", data.periods.length ? "courses" : "empty") });
   } else if (calendar.status !== 401) {
     view = "load-error";
   }

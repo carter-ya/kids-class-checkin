@@ -62,7 +62,7 @@ function notice(message = "", failed = false) {
 el("dismiss-notice").onclick = () => notice();
 
 function view(name) {
-  for (const id of ["load-error", "family-pending", "login", "family-welcome", "journal"]) el(id).hidden = id !== name;
+  for (const id of ["load-error", "login", "family-welcome", "journal"]) el(id).hidden = id !== name;
   el("family-tools").hidden = name !== "journal";
   el("journal").removeAttribute("data-opening");
 }
@@ -399,7 +399,9 @@ async function switchFamily(id) {
     if (id === null) {
       // A completed membership removal invalidates the old journal even if the next read fails.
       clearJournal();
-      view("family-pending");
+      view("journal");
+      el("family-tools").hidden = true;
+      el("journal").setAttribute("data-opening", "");
     } else render();
     const data = await preferredCalendar(await readCalendar(null, id));
     if (version !== revision) return;
