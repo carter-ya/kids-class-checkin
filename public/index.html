@@ -6,6 +6,7 @@
   <link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48">
   <link rel="icon" type="image/png" sizes="64x64" href="/rabbit-icon.png">
   <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+  <link rel="preload" href="/fonts/journal-ui-6d55d6648c.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="/style.css"><script type="module" src="/app.js"></script>
 </head>
 <body>
@@ -28,7 +29,6 @@
 </div>
 <main class="wrap">
   <template id="entry-calendar"></template>
-  <p id="family-pending" role="status" hidden>正在读取你的家庭列表…</p>
   <section id="load-error" class="welcome-note" hidden>
     <img src="/rabbit-icon.png" width="64" height="64" alt="">
     <h1>暂时读不到课程记录</h1>
@@ -80,7 +80,17 @@
     <button id="welcome-logout" class="text-link">退出登录</button>
   </section>
   <section id="journal" hidden aria-labelledby="journal-title">
+    <span id="journal-status" class="visually-hidden" role="status" aria-atomic="true"></span>
     <div class="journal-title"><h1 id="journal-title">我的上课日历</h1></div>
+    <div class="journal-skeleton" role="status" aria-label="正在读取家庭课程">
+      <div class="skeleton-course" aria-hidden="true"><i></i><i></i></div>
+      <div class="dashboard skeleton-pages" aria-hidden="true">
+        <div class="skeleton-summary"><i></i><i></i><i></i></div>
+        <div class="skeleton-months"><i></i><div class="skeleton-grid">
+          <b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b>
+        </div></div>
+      </div>
+    </div>
     <div class="course-bar">
       <h2 id="course-summary-month">本月课程</h2>
       <button id="course-management" class="notebook-button" aria-haspopup="dialog"><span aria-hidden="true">✿</span> 管理课程</button>
@@ -104,7 +114,7 @@
         <div class="summary-body">
         <h2 id="course-title">上课小脚印</h2><div class="counts">已上 <span class="tally"><strong id="count">0</strong><span class="sparkles" aria-hidden="true"><i>✦</i><i>★</i><i>✧</i></span></span> 节 <span>· 还剩 <b id="left">35</b> 节</span></div>
         <progress id="progress" max="35" value="0" aria-label="已完成课时"></progress>
-        <button class="primary" id="check-today">今天上课啦</button>
+        <button class="primary" id="check-today"><span id="today-label">今天上课啦</span></button>
       </div></section>
       <section class="month-card" aria-label="上课记录">
         <div class="view-switch" role="group" aria-label="选择查看方式">

@@ -9,6 +9,21 @@ let month = "";
 let busy = false;
 let revision = 0;
 let selected = null;
+let pending = null;
+let stickerTimer;
+
+function startPending(action) {
+  pending = action;
+  el("journal-status").textContent = action.description;
+  stickerTimer = setTimeout(() => el("journal").classList.add("show-pending-sticker"), 200);
+}
+
+function endPending() {
+  clearTimeout(stickerTimer);
+  el("journal").classList.remove("show-pending-sticker");
+  el("journal-status").textContent = "";
+  pending = null;
+}
 
 const access = accessControls(async (path, payload) => {
   if (busy) throw new Error("请稍后再试");
@@ -47,12 +62,13 @@ function notice(message = "", failed = false) {
 el("dismiss-notice").onclick = () => notice();
 
 function view(name) {
-  for (const id of ["load-error", "family-pending", "login", "family-welcome", "journal"]) el(id).hidden = id !== name;
+  for (const id of ["load-error", "login", "family-welcome", "journal"]) el(id).hidden = id !== name;
   el("family-tools").hidden = name !== "journal";
   el("journal").removeAttribute("data-opening");
 }
 
 function clearJournal() {
+  endPending();
   calendar = null;
   familyUI.reset();
   if (el("course-dialog").open) el("course-dialog").close();
@@ -216,13 +232,14 @@ function renderCycleBookmarks(history, selectedId) {
     return;
   }
 
+  const openingBookmark = history.some(period => period.id === pending?.period?.id);
   const buttons = history.map((period, index) => {
     const selected = period.id === selectedId;
     const title = "第 " + (index + 1) + " 期 · " + period.total + " 节";
     const range = period.first + " 至 " + period.last;
     if (selected) {
       el("selected-cycle-title").textContent = title;
-      el("selected-cycle-info").textContent = range;
+      el("selected-cycle-info").textContent = openingBookmark ? pending.message : range;
     }
     const button = document.createElement("button");
     button.dataset.cycle = period.id;
@@ -269,6 +286,10 @@ function renderCourseControls() {
     const monthCount = periods.reduce((sum, item) => sum + item.thisMonth, 0);
     const label = current.last < calendar.today ? "上期剩余" : current.first > calendar.today ? "下期剩余" : "本期剩余";
     stats.textContent = "本月 " + monthCount + " 节 · " + label + " " + (current.total - current.done) + " 节";
+    if (pending?.period?.courseId === current.courseId) {
+      stats.textContent = pending.message;
+      button.classList.add("is-pending");
+    }
     const copy = document.createElement("div");
     copy.className = "course-copy";
     copy.append(name, stats);
@@ -303,7 +324,9 @@ function render() {
   const checkedToday = dates.includes(today);
   const outside = today < first || today > last;
   el("check-today").disabled = busy || outside || checkedToday || done >= total;
-  el("check-today").textContent = done >= total ? total + " 节课，全部完成啦！" : checkedToday ? "今天已打卡 ✓" :
+  const savingToday = pending?.date === today;
+  el("check-today").classList.toggle("is-pending", savingToday);
+  el("today-label").textContent = savingToday ? pending.message : done >= total ? total + " 节课，全部完成啦！" : checkedToday ? "今天已打卡 ✓" :
     today < first ? "课程尚未开始" : today > last ? "课程已结束" : "今天上课啦";
   el("prev").disabled = month <= monthOf(first);
   el("next").disabled = month >= monthOf(last);
@@ -318,6 +341,9 @@ function render() {
   el("prev-year").disabled = year <= Number(first.slice(0, 4));
   el("next-year").disabled = year >= Number(last.slice(0, 4));
   el("month-count").textContent = "当月已上 " + counts.get(month) + " 节";
+  if (pending?.date && monthOf(pending.date) === month) {
+    el("month-count").textContent = Number(pending.date.slice(-2)) + " 日 · " + pending.message;
+  }
   renderMonthlyOverview(counts);
   const { from, to, leading } = monthSpan(month, first, last);
   const children = [];
@@ -335,6 +361,10 @@ function render() {
     button.dataset.date = date;
     button.disabled = busy || date > today || (!checked && done >= total);
     button.setAttribute("aria-label", date + (date === today ? " 今天" : "") + (checked ? " 已打卡" : " 未打卡"));
+    if (pending?.date === date) {
+      button.classList.add("is-pending");
+      button.setAttribute("aria-label", date + " " + pending.message);
+    }
     if (date === today) button.setAttribute("aria-current", "date");
     children.push(button);
   }
@@ -369,7 +399,9 @@ async function switchFamily(id) {
     if (id === null) {
       // A completed membership removal invalidates the old journal even if the next read fails.
       clearJournal();
-      view("family-pending");
+      view("journal");
+      el("family-tools").hidden = true;
+      el("journal").setAttribute("data-opening", "");
     } else render();
     const data = await preferredCalendar(await readCalendar(null, id));
     if (version !== revision) return;
@@ -449,6 +481,12 @@ async function loadPeriod(id) {
 
 async function switchPeriod(id) {
   if (busy) return;
+  const period = calendar.periods.find(item => item.id === Number(id));
+  if (!period) return;
+  const history = calendar.periods.filter(item => item.courseId === period.courseId);
+  const message = period.courseId === currentPeriod().courseId
+    ? "正在翻到第 " + (history.indexOf(period) + 1) + " 期…" : "正在翻页…";
+  startPending({ period, message, description: period.name + "，" + message });
   const fromCard = el("course-list").contains(document.activeElement);
   busy = true;
   revision++;
@@ -459,6 +497,7 @@ async function switchPeriod(id) {
     if (err.status === 401) return showLogin();
     notice("切换失败，请重试", true);
   } finally {
+    endPending();
     busy = false;
     if (calendar) {
       render();
@@ -650,25 +689,48 @@ el("welcome-logout").onclick = el("logout").onclick = async () => {
 
 async function save(date, remove = false) {
   if (!calendar || busy) return;
+  const cycleId = calendar.cycleId;
+  const message = remove ? "正在撤销…" : "正在记课…";
+  startPending({ date, message, description: date + "，" + message });
   let stamped = false;
   busy = true;
-  revision++;
+  const version = ++revision;
   notice();
   render();
   try {
-    calendar = await api("checkins/" + date + cycleQuery(), { method: remove ? "DELETE" : "PUT" });
+    const updated = await api("checkins/" + date + cycleQuery(), { method: remove ? "DELETE" : "PUT" });
+    if (revision !== version) return;
+    calendar = updated;
     stamped = !remove;
-    notice(remove ? "已撤销这次打卡。" : "记好啦，又闪亮了一颗小星星！");
   } catch (err) {
+    if (revision !== version) return;
     if (err.status === 401) return showLogin();
-    notice(err.status ? err.message : "网络连接失败，请重试", true);
     // A lost response can follow a successful write. Refresh before a retry.
-    try { selectPeriod(await readCalendar(calendar.cycleId)); } catch (retry) { if (retry.status === 401) showLogin(); }
+    pending.message = "正在核对记录…";
+    el("journal-status").textContent = date + "，" + pending.message;
+    render();
+    try {
+      const latest = await readCalendar(cycleId);
+      if (revision !== version) return;
+      selectPeriod(latest);
+      const matches = latest.cycleId === cycleId && latest.dates.includes(date) === !remove;
+      if (err.status < 500 || !matches) {
+        notice(err.status ? err.message : "这次更改未记入，请重试。", true);
+        return;
+      }
+      stamped = !remove;
+    } catch (retry) {
+      if (retry.status === 401) return showLogin();
+      notice(err.status && err.status < 500 ? err.message : "暂时无法核对记录，请刷新手账后再试。", true);
+      return;
+    }
   } finally {
+    endPending();
     busy = false;
     if (calendar) render();
     if (stamped) celebrate(date);
   }
+  notice(remove ? "已撤销这次打卡。" : "记好啦，又闪亮了一颗小星星！");
 }
 
 function moveOverviewYear(offset) {
