@@ -138,6 +138,8 @@ export function familyControls({ api, current, switchFamily, showLogin, notice }
     editingFamily = family.id;
     panel("family-home", "我的家庭");
     el("member-list").replaceChildren();
+    el("members-retry").hidden = true;
+    el("member-skeleton").hidden = false;
     el("family-name").textContent = family.name;
     el("invite-details").open = false;
     el("invite-details").hidden = true;
@@ -159,8 +161,16 @@ export function familyControls({ api, current, switchFamily, showLogin, notice }
         return row;
       });
       el("member-list").replaceChildren(...rows);
-    } catch (err) { if (sheet.open && version === listVersion) failure(err, "family-error"); }
+    } catch (err) {
+      if (sheet.open && version === listVersion) {
+        failure(err, "family-error");
+        el("members-retry").hidden = err.status === 401;
+      }
+    } finally {
+      if (version === listVersion) el("member-skeleton").hidden = true;
+    }
   }
+  el("members-retry").onclick = home;
   function form(action, member = null) {
     listVersion++;
     editingFamily = current().family?.id;

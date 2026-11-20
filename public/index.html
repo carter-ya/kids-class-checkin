@@ -50,6 +50,7 @@
           <label for="password">密码</label><div class="pass"><input id="password" name="password" type="password" autocomplete="current-password" required maxlength="256" placeholder="请输入密码"><button type="button" id="show-pass" aria-controls="password" aria-pressed="false">显示</button></div>
           <button class="primary" id="submit-login">登录手账</button>
         </form></div>
+        <span id="access-status" class="visually-hidden" role="status"></span>
         <p id="login-error" class="error" role="alert"></p>
         <p class="form-note"><button type="button" class="text-link" id="access-toggle">还没有账号？去注册</button></p>
       </div>
@@ -87,7 +88,7 @@
       <div class="dashboard skeleton-pages" aria-hidden="true">
         <div class="skeleton-summary"><i></i><i></i><i></i></div>
         <div class="skeleton-months"><i></i><div class="skeleton-grid">
-          <b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b>
+          <b></b><b></b><b></b><b></b><b></b><b></b>
         </div></div>
       </div>
     </div>
@@ -118,18 +119,18 @@
       </div></section>
       <section class="month-card" aria-label="上课记录">
         <div class="view-switch" role="group" aria-label="选择查看方式">
-          <button id="show-calendar" aria-controls="calendar-detail" aria-pressed="false">上课月历</button>
-          <button id="show-months" aria-controls="monthly-overview" aria-pressed="true">每月课时</button>
+          <button id="show-calendar" aria-controls="calendar-detail" aria-pressed="true">上课月历</button>
+          <button id="show-months" aria-controls="monthly-overview" aria-pressed="false">每月课时</button>
         </div>
         <p id="period-range" class="period-range"></p>
         <div class="page-stack">
-        <div id="calendar-detail" inert>
+        <div id="calendar-detail">
         <div class="month-toolbar calendar-banner"><div class="month-caption"><i id="month-friend" class="animal-sticker" aria-hidden="true"></i><h2 id="month-name" tabindex="-1"></h2></div><div class="month-actions"><button id="prev" aria-label="上个月">‹</button><button id="current">今天</button><button id="next" aria-label="下个月">›</button></div></div>
         <div class="week" aria-hidden="true"><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span></div>
         <div id="days" class="days"></div>
         <div class="legend"><span><i></i> 今天</span><span><b>★</b> 已打卡</span><strong id="month-count"></strong></div>
         </div>
-        <div id="monthly-overview">
+        <div id="monthly-overview" inert>
           <div id="years" class="month-toolbar" hidden><h3 id="year-label"></h3><div class="month-actions"><button id="prev-year" aria-label="上一年">‹</button><button id="next-year" aria-label="下一年">›</button></div></div>
           <div id="month-groups"></div>
         </div>
@@ -171,7 +172,11 @@
   <div class="note-heading"><h2 id="family-heading">我的家庭</h2><button id="family-close" class="close-note" aria-label="关闭家庭">×</button></div>
   <section id="family-home">
     <h3 id="family-name"></h3>
+    <div id="member-skeleton" class="member-skeleton" role="status" aria-label="正在读取家人列表" hidden>
+      <i aria-hidden="true"></i><i aria-hidden="true"></i><i aria-hidden="true"></i>
+    </div>
     <ul id="member-list" class="member-list"></ul>
+    <button type="button" id="members-retry" class="text-link" hidden>重新读取家人列表</button>
     <button class="primary" id="member-add">＋ 添加家人</button>
     <details id="invite-details"><summary>邀请家人加入</summary>
       <div id="invite-ready" hidden>

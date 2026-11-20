@@ -78,7 +78,7 @@ function clearJournal() {
   selected = null;
   el("days").replaceChildren();
   el("month-groups").replaceChildren();
-  showMonthlyOverview(true);
+  showMonthlyOverview(false);
   el("owner").textContent = "";
   el("management-sheet").close();
   el("course-list").replaceChildren();
