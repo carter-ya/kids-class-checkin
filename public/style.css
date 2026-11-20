@@ -208,7 +208,14 @@ label > input:not([type="radio"]) { display: block; margin-top: 10px; }
   .month-card { min-width: 0; }
   .period-range { margin-top: -7px; font-size: .86rem; }
   .legend { flex-wrap: wrap; gap: 5px 10px; }
-  #course-dialog input { min-width: 0; max-width: 100%; font-size: 1rem; }
+  #cycle-fields { display: grid; grid-template-columns: minmax(0, 1fr); }
+  #cycle-fields > label { min-inline-size: 0; margin-block-end: 0; }
+  #course-dialog input { min-width: 0; max-width: 100%; font-size: max(16px, 1rem); }
+  #cycle-fields input[type="date"] {
+    -webkit-appearance: none; appearance: none;
+    inline-size: 100%; min-block-size: 44px; text-align: start;
+  }
+  #cycle-fields input::-webkit-date-and-time-value { text-align: start; margin: 0; }
 }
 
 .toast {

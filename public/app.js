@@ -569,9 +569,11 @@ function openCourseForm(mode) {
   }
   el("course-guide").hidden = mode !== "create" || calendar.courseGuideDone;
   pointToCourseField(el("course-name"));
+  const initialFocus = el(deleting ? "close-course" : showName ? "course-name" : "course-dialog-title");
+  // Set the target before showModal so mobile browsers never focus a date on entry.
+  initialFocus.autofocus = true;
   el("course-dialog").showModal();
-  if (deleting) el("close-course").focus();
-  else if (!el("course-guide").hidden) el("course-name").focus();
+  initialFocus.autofocus = false;
 }
 el("course-management").onclick = () => {
   if (!busy && calendar?.cycleId) el("management-sheet").showModal();
