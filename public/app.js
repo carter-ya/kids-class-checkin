@@ -47,9 +47,9 @@ function notice(message = "", failed = false) {
 el("dismiss-notice").onclick = () => notice();
 
 function view(name) {
-  for (const id of ["loading", "login", "family-welcome", "journal"]) el(id).hidden = id !== name;
+  for (const id of ["load-error", "family-pending", "login", "family-welcome", "journal"]) el(id).hidden = id !== name;
   el("family-tools").hidden = name !== "journal";
-  el("reload").hidden = true;
+  el("journal").removeAttribute("data-opening");
 }
 
 function clearJournal() {
@@ -82,9 +82,7 @@ function showLogin() {
 }
 
 function showLoadFailure() {
-  view("loading");
-  el("loading").textContent = "暂时无法打开手账";
-  el("reload").hidden = false;
+  view("load-error");
 }
 
 function showMonthlyOverview(show) {
@@ -371,8 +369,7 @@ async function switchFamily(id) {
     if (id === null) {
       // A completed membership removal invalidates the old journal even if the next read fails.
       clearJournal();
-      view("loading");
-      el("loading").textContent = "正在打开手账…";
+      view("family-pending");
     } else render();
     const data = await preferredCalendar(await readCalendar(null, id));
     if (version !== revision) return;
@@ -397,12 +394,12 @@ function inviteToken() {
   return /^[a-f0-9]{32}$/.test(token || "") ? token : null;
 }
 
-async function refresh() {
+async function refresh(firstCalendar) {
   if (busy) return;
   const version = ++revision;
   try {
     let data;
-    try { data = await readCalendar(calendar?.cycleId); }
+    try { data = firstCalendar ?? await readCalendar(calendar?.cycleId); }
     catch (err) {
       if (err.status !== 403 || !calendar) throw err;
       data = await readCalendar(null, null);
@@ -727,9 +724,19 @@ el("confirm-action").onclick = () => {
   el("confirm").close();
   void save(date, remove);
 };
-el("reload").onclick = refresh;
+el("reload").onclick = () => refresh();
 document.addEventListener("visibilitychange", () => {
   if (!document.hidden && calendar) void refresh();
 });
 setInterval(() => { if (!document.hidden && calendar && !el("confirm").open) void refresh(); }, 60000);
-void refresh();
+const entry = el("entry-calendar");
+const firstCalendar = entry.content.textContent;
+entry.remove();
+if (firstCalendar) {
+  void refresh(JSON.parse(firstCalendar));
+} else if (!el("login").hidden) {
+  if (inviteToken()) el("access-intro").textContent = "登录或注册后，就能继续接受家人的邀请。";
+} else if (el("load-error").hidden) {
+  // Static previews can serve the template without a Worker.
+  void refresh();
+}

@@ -31,6 +31,9 @@ async function startApp(t, { migrateOnStart = true, fixedClock = true } = {}) {
     };\n` : "";
   const runtime = new Miniflare(convertV4MiniflareOptions({
     modules: true, compatibilityDate: "2026-05-01", d1Databases: ["DB"],
+    serviceBindings: { ASSETS: async () => new Response(await readFile(new URL("../public/index.html", import.meta.url)), {
+      headers: { "Content-Type": "text/html; charset=utf-8", ETag: '"static-template"' }
+    }) },
     bindings: { CLASS_TIME_ZONE: "Asia/Shanghai" },
     script: clock + await readFile(new URL("../src/worker.js", import.meta.url), "utf8")
   }));
@@ -63,6 +66,40 @@ async function startApp(t, { migrateOnStart = true, fixedClock = true } = {}) {
   const check = (date, cookie, method = "PUT") => call("checkins/" + date, { method, cookie });
   return { runtime, db, call, post, session, family, check };
 }
+
+test("首页直接显示登录或家庭入口，安全携带当前账号的日历并支持读取失败重试", async t => {
+  const { runtime, session, family, db } = await startApp(t);
+  async function home(cookie = "") {
+    const response = await runtime.dispatchFetch(origin + "/", { headers: { Cookie: cookie, "If-None-Match": '"static-template"' } });
+    assert.match(response.headers.get("Cache-Control"), /private, no-store/);
+    assert.equal(response.headers.get("ETag"), null);
+    return { status: response.status, html: await response.text() };
+  }
+  const visible = (html, id) => !html.match(new RegExp('<section id="' + id + '"([^>]*)>'))[1].includes(" hidden");
+  for (const cookie of ["", "__Host-class_session=" + "0".repeat(64)]) {
+    const { status, html } = await home(cookie);
+    assert.equal(status, 200);
+    assert.ok(visible(html, "login"));
+    assert.ok(!visible(html, "journal"));
+    assert.match(html, /<template id="entry-calendar"><\/template>/);
+  }
+  const cookie = await session("register", "home-tester");
+  assert.ok(visible((await home(cookie)).html, "family-welcome"));
+  const name = "<星星&月亮>";
+  await family(cookie, name);
+  const { html } = await home(cookie);
+  assert.ok(visible(html, "journal"));
+  assert.ok(!visible(html, "login"));
+  assert.match(html, /&lt;星星&amp;月亮&gt;/);
+  assert.ok(!html.includes(name));
+  assert.ok(!(await home()).html.includes("home-tester"));
+  await db.prepare("DROP TABLE sessions").run();
+  const failure = await home(cookie);
+  assert.equal(failure.status, 503);
+  assert.ok(visible(failure.html, "load-error"));
+  assert.ok(!visible(failure.html, "login"));
+  assert.equal((await home()).status, 200);
+});
 
 test("旧手账迁移保留原始打卡、账号归属和邀请码的七日过渡期", async t => {
   // Migration deadlines use SQLite's wall clock, so run the Worker on the same clock.

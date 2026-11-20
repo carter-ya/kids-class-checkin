@@ -200,6 +200,34 @@ async function invitePage(request, db, user, token, now) {
   } });
 }
 
+async function homePage(request, env) {
+  // Always fetch the full template. Its asset validators describe the shared file only.
+  const asset = await env.ASSETS.fetch(new Request(new URL("/", request.url)));
+  if (!asset.ok) return asset;
+  const headers = new Headers(asset.headers);
+  for (const key of ["ETag", "Last-Modified", "Content-Length"]) headers.delete(key);
+  headers.set("Cache-Control", "private, no-store");
+  headers.set("Vary", "Cookie");
+  if (request.method === "HEAD") return new Response(null, { headers });
+
+  // Use the same authorization and calendar selection as a normal calendar read.
+  const calendar = await handle(new Request(new URL("/api/calendar", request.url), {
+    headers: { Cookie: request.headers.get("Cookie") || "" }
+  }), env).catch(() => error("课程读取失败", 503));
+  const page = new HTMLRewriter();
+  let view = "login";
+  if (calendar.ok) {
+    const data = await calendar.json();
+    view = data.family ? "journal" : "family-welcome";
+    page.on("#entry-calendar", { element: e => e.setInnerContent(JSON.stringify(data)) });
+    if (data.family) page.on("#journal", { element: e => e.setAttribute("data-opening", "") });
+  } else if (calendar.status !== 401) {
+    view = "load-error";
+  }
+  page.on("#" + view, { element: e => e.removeAttribute("hidden") });
+  return page.transform(new Response(asset.body, { headers, status: view === "load-error" ? 503 : 200 }));
+}
+
 async function handle(request, env) {
   const url = new URL(request.url);
   const path = url.pathname;
@@ -433,6 +461,9 @@ async function handle(request, env) {
 export default {
   async fetch(request, env) {
     try {
+      if (new URL(request.url).pathname === "/" && ["GET", "HEAD"].includes(request.method)) {
+        return await homePage(request, env);
+      }
       return await handle(request, env);
     } catch (err) {
       console.error("请求处理失败", err.name, new URL(request.url).pathname.split("/").slice(0,2).join("/"));

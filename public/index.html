@@ -27,8 +27,14 @@
   <button id="dismiss-notice" type="button" aria-label="关闭提示" hidden>×</button>
 </div>
 <main class="wrap">
-  <p id="loading" role="status">正在打开手账…</p>
-  <button id="reload" class="quiet" hidden>重新打开</button>
+  <template id="entry-calendar"></template>
+  <p id="family-pending" role="status" hidden>正在读取你的家庭列表…</p>
+  <section id="load-error" class="welcome-note" hidden>
+    <img src="/rabbit-icon.png" width="64" height="64" alt="">
+    <h1>暂时读不到课程记录</h1>
+    <p>请检查网络连接，再试一次。</p>
+    <button id="reload" class="primary">重新读取</button>
+  </section>
   <section id="login" class="book" hidden aria-labelledby="book-title">
     <div class="cover">
       <div class="cover-heading"><span class="little-star" aria-hidden="true">✦</span><h1 id="book-title">上课<span>成长手账</span></h1></div>
